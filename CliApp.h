@@ -67,10 +67,10 @@ protected:
 		return static_cast<Child*>(this)->run();
 	}
 
+public:
 	using OptionParser::addOption;
 	using OptionParser::addOptions;
 
-public:
 	virtual ~CliAppBase() = default;
 };
 
