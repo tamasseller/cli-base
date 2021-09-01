@@ -56,17 +56,19 @@ OptionParser::OptionParser(const std::string &header): header(header)
 		auto longestOptionsIt = std::max_element(flattened.begin(), flattened.end(), [](const auto &a, const auto &b){ return a.second.first.length() < b.second.first.length(); });
 		auto maxOptionsLength = longestOptionsIt->second.first.length();
 
-		std::cout << this->header << std::endl << std::endl;
-		std::cout << "Options: "<< std::endl;
+		std::cerr << this->header << std::endl << std::endl;
+		std::cerr << "Options: "<< std::endl;
 
 		for(auto& o: flattened)
 		{
 			const auto names = o.first;
 			const auto options = o.second.first;
 
-			std::cout << names << std::string(maxNameLength - names.length() + 1, ' ')
+			std::cerr << names << std::string(maxNameLength - names.length() + 1, ' ')
 					<< options << std::string(maxOptionsLength - options.length() + 1, ' ') << o.second.second << std::endl;
 		}
+
+		std::cerr << std::endl;
 
 		throw SimplyExit{};
 	});
@@ -80,7 +82,7 @@ bool OptionParser::processArgs(const std::list<std::string>& args)
 
 		if(const auto opt = options.find(name); opt == options.end())
 		{
-			std::cerr << "Unknown option: " << name << std::endl;
+			std::cerr << "Unknown option: '" << name << "' use -h or --help flag to display usage information" << std::endl;
 			return false;
 		}
 		else

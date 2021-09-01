@@ -3,6 +3,7 @@
 #include <iostream>
 #include <algorithm>
 #include <iterator>
+#include <numeric>
 
 #include <libgen.h>
 
@@ -57,14 +58,18 @@ int CliApp::main(int argc, const char* argv[])
 	{
 		std::cerr << "No operation requested." << std::endl;
 		std::cerr << std::endl << "Usage: " << basename(const_cast<char*>(argv[0])) << " <operation> [options]" << std::endl;
-		std::cerr << std::endl << "Available operations:" << std::endl;
+		std::cerr << std::endl << "Available operations:" << std::endl << std::endl;
 
-		std::transform(CliApp::apps.begin(), CliApp::apps.end(), std::ostream_iterator<std::string>(std::cerr, "\n"), [](const auto& l)
-		{
-			return std::string("    ") + l.first;
+		const auto maxLen = std::accumulate(CliApp::apps.begin(), CliApp::apps.end(), size_t(0), [](size_t l, const auto& p) {
+			return std::max(l, p.first.length());
 		});
 
-		std::cerr << std::endl;
+		std::transform(CliApp::apps.begin(), CliApp::apps.end(), std::ostream_iterator<std::string>(std::cerr, "\n"), [maxLen](const auto& l)
+		{
+			return std::string(maxLen + 6 - l.first.length(), ' ') + l.first + "  -  " + l.second->getDesc();
+		});
+
+		std::cerr << std::endl << std::endl;
 	}
 
 	return -1;

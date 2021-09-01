@@ -20,6 +20,9 @@ class CliApp
 	/// Entry point of an applet.
 	virtual int operator()(int argc, const char* argv[]) = 0;
 
+	/// Get description of the applet.
+	virtual const char* getDesc() = 0;
+
 protected:
 	/// Registers an applet in the global registry.
 	inline CliApp(const char* name) {
@@ -43,6 +46,11 @@ class CliAppBase: CliApp, OptionParser
 {
 	/// Stored arguments, for applet processing.
 	std::list<std::string> args;
+
+	/// Forward description of the applet from CRTP child.
+	virtual const char* getDesc() override {
+		return Child::appDesc;
+	}
 
 protected:
 	/// Static (singleton) instance of the applet class.
