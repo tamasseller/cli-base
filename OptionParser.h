@@ -110,13 +110,25 @@ struct OptionParser
 	 */
 	const std::string header;
 
+	struct CallArgumentEvaluationSequencingHelper
+	{
+		template<class C, class... Args>
+		inline constexpr CallArgumentEvaluationSequencingHelper(C&& c, Args&&... args)
+		{
+			c(std::forward<Args>(args)...);
+		}
+	};
+
 	/**
 	 * Helper used to invoke the correct
 	 */
 	template<class Obj, class... Args>
 	static inline void parseOptions(void (Obj::* method)(Args...) const, const Obj& obj, cListIter& it, cListIter end)
 	{
-		(obj.*method)(ArgumentParser<std::remove_const_t<std::remove_reference_t<Args>>>::parse(it, end)...);
+		CallArgumentEvaluationSequencingHelper{
+			[&obj, &method](auto&&... x){ (obj.*method)(std::forward<decltype(x)>(x)...); },
+			ArgumentParser<std::remove_const_t<std::remove_reference_t<Args>>>::parse(it, end)...
+		};
 	}
 
 	/**
