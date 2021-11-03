@@ -5,7 +5,7 @@ Command line interface framework for C++ multi-function utility applications (li
  - ℹ️ Automatic help generation,
  - ☑️ Command line option parsing,
  - ⏩ Tab completion,
- - 😏 Suggestions for mistyped commands based on minimal (Levenshtein distance)[https://en.wikipedia.org/wiki/Levenshtein_distance],
+ - 😏 Suggestions for mistyped commands based on minimal [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance),
  - ▶️ Applet dispatch in independent compilation units.
  
 ## Format
