@@ -5,6 +5,8 @@
 #include <list>
 #include <memory>
 #include <functional>
+#include <string>
+#include <stdexcept>
 
 #include <cassert>
 
