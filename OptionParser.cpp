@@ -1,7 +1,28 @@
+/*******************************************************************************
+ *
+ * Copyright (c) 2021 Tamás Seller. All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *******************************************************************************/
+
 #include "OptionParser.h"
+#include "Levenshtein.h"
 
 #include <iostream>
 #include <numeric>
+#include <algorithm>
 
 struct SimplyExit {};
 
@@ -74,16 +95,35 @@ OptionParser::OptionParser(const std::string &header): header(header)
 	});
 }
 
-bool OptionParser::processArgs(const std::list<std::string>& args)
+std::optional<std::list<std::string>> OptionParser::processArgs(const std::list<std::string>& args)
 {
+	std::list<std::string> ret;
+
 	for(auto it = args.cbegin(); it != args.cend();)
 	{
 		const auto name = *it++;
 
 		if(const auto opt = options.find(name); opt == options.end())
 		{
-			std::cerr << "Unknown option: '" << name << "' use -h or --help flag to display usage information" << std::endl;
-			return false;
+			if(name.length() > 1 && name[0] == '-')
+			{
+				std::cerr << "Unknown option: '" << name << "' use -h or --help flag to display usage information" << std::endl;
+
+				std::list<std::pair<size_t, std::string>> lDists;
+
+				std::transform(options.begin(), options.end(), std::back_inserter(lDists), [name](const auto& l) {
+					return std::make_pair(levenshteinDistance(name, l.first), l.first);
+				});
+
+				const auto suggested = std::min_element(lDists.begin(), lDists.end(), [](const auto& a, const auto& b){return a.first < b.first;});
+				std::cerr << std::endl << "Did you mean: " << suggested->second << "?" << std::endl;
+
+				return std::nullopt;
+			}
+			else
+			{
+				ret.push_back(name);
+			}
 		}
 		else
 		{
@@ -94,14 +134,14 @@ bool OptionParser::processArgs(const std::list<std::string>& args)
 			catch(const std::exception &e)
 			{
 				std::cerr << "Could not process option " << name  << ": " << e.what() << std::endl;
-				return false;
+				return std::nullopt;
 			}
 			catch(const SimplyExit&)
 			{
-				return false;
+				return std::nullopt;
 			}
 		}
 	}
 
-	return true;
+	return ret;
 }

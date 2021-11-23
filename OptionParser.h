@@ -1,9 +1,29 @@
-#ifndef LIBUNO_TEST_OPTIONPARSER_H_
-#define LIBUNO_TEST_OPTIONPARSER_H_
+/*******************************************************************************
+ *
+ * Copyright (c) 2021 Tamás Seller. All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *******************************************************************************/
+
+#ifndef CLI_BASE_OPTIONPARSER_H_
+#define CLI_BASE_OPTIONPARSER_H_
 
 #include <map>
 #include <list>
 #include <memory>
+#include <optional>
 #include <functional>
 #include <string>
 #include <stdexcept>
@@ -112,13 +132,25 @@ struct OptionParser
 	 */
 	const std::string header;
 
+	struct CallArgumentEvaluationSequencingHelper
+	{
+		template<class C, class... Args>
+		inline constexpr CallArgumentEvaluationSequencingHelper(C&& c, Args&&... args)
+		{
+			c(std::forward<Args>(args)...);
+		}
+	};
+
 	/**
 	 * Helper used to invoke the correct
 	 */
 	template<class Obj, class... Args>
 	static inline void parseOptions(void (Obj::* method)(Args...) const, const Obj& obj, cListIter& it, cListIter end)
 	{
-		(obj.*method)(ArgumentParser<std::remove_const_t<std::remove_reference_t<Args>>>::parse(it, end)...);
+		CallArgumentEvaluationSequencingHelper{
+			[&obj, &method](auto&&... x){ (obj.*method)(std::forward<decltype(x)>(x)...); },
+			ArgumentParser<std::remove_const_t<std::remove_reference_t<Args>>>::parse(it, end)...
+		};
 	}
 
 	/**
@@ -151,7 +183,7 @@ public:
 	 * If all arguments are parsed successfully **and** the usage page
 	 * is not requested with -h or --help then it returns true.
 	 */
-	bool processArgs(const std::list<std::string>& args);
+	std::optional<std::list<std::string>> processArgs(const std::list<std::string>& args);
 
 	/**
 	 * Add a user callback that is called when an option (specified
@@ -182,4 +214,4 @@ public:
 	}
 };
 
-#endif /* LIBUNO_TEST_OPTIONPARSER_H_ */
+#endif /* CLI_BASE_OPTIONPARSER_H_ */

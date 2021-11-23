@@ -1,0 +1,23 @@
+toolname=$(basename $BASH_SOURCE)
+
+expand_aliases_restore_flag=$(shopt -q expand_aliases && echo -s || echo -u)
+shopt -qs expand_aliases
+alias _completion_funcname_=_${toolname}_completions
+
+_completion_funcname_()
+{
+	local cur prev words cword
+    _init_completion || return
+	
+    for i in ${!words[@]}; do
+        words[i]="$(printf '%s' "${words[i]}" | xargs printf '%s\n' 2>/dev/null || true)"
+    done
+
+	output="$(${COMP_WORDS[0]} _autocomplete $COMP_CWORD "${words[@]}")"
+    local IFS=$'\n'
+    COMPREPLY=( $( compgen -W '$output' -- $cur ) )
+}
+
+shopt -q $expand_aliases_restore_flag expand_aliases
+
+complete -F "_${toolname}_completions" $toolname

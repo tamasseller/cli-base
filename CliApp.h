@@ -1,5 +1,24 @@
-#ifndef LIBUNO_TEST_CLIAPP_H_
-#define LIBUNO_TEST_CLIAPP_H_
+/*******************************************************************************
+ *
+ * Copyright (c) 2021 Tamás Seller. All rights reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *******************************************************************************/
+
+#ifndef CLI_BASE_CLIAPP_H_
+#define CLI_BASE_CLIAPP_H_
 
 #include "OptionParser.h"
 
@@ -13,6 +32,7 @@
 class CliApp
 {
 	friend int main(int argc, const char* argv[]);
+	friend class Autocompleter;
 
 	/// Global registry of applets.
 	static inline std::map<std::string, class CliApp*> apps;
@@ -21,7 +41,13 @@ class CliApp
 	virtual int operator()(int argc, const char* argv[]) = 0;
 
 	/// Get description of the applet.
-	virtual const char* getDesc() = 0;
+	virtual const char* getDesc() const = 0;
+
+	/// Get whether the applet should be visible.
+	virtual bool visibleByDefault() const = 0;
+
+	/// Autocompletion entry point.
+	virtual std::list<std::string> autocomplete(std::list<std::string>::iterator from, std::list<std::string>::iterator to) = 0;
 
 protected:
 	/// Registers an applet in the global registry.
@@ -47,9 +73,17 @@ class CliAppBase: CliApp, OptionParser
 	/// Stored arguments, for applet processing.
 	std::list<std::string> args;
 
+	/// Makes processCommandLine return error no matter what.
+	bool dryRun = false;
+
 	/// Forward description of the applet from CRTP child.
-	virtual const char* getDesc() override {
+	virtual const char* getDesc() const final override {
 		return Child::appDesc;
+	}
+
+	/// Forward visibility information of the applet from CRTP child.
+	virtual bool visibleByDefault() const final override {
+		return true;
 	}
 
 protected:
@@ -64,7 +98,13 @@ protected:
 		OptionParser(std::string(Child::appDesc) + "\nUsage: " + Child::appName + " [options]")  {}
 
 	/// Process stored arguments (proxy for child)
-	inline bool processCommandLine() {
+	inline std::optional<std::list<std::string>> processCommandLine()
+	{
+		if(dryRun)
+		{
+			return std::nullopt;
+		}
+
 		return this->processArgs(args);
 	}
 
@@ -73,6 +113,16 @@ protected:
 	{
 		args = {argv, argv + argc};
 		return static_cast<Child*>(this)->run();
+	}
+
+	/// Autocompletion entry point.
+	inline virtual std::list<std::string> autocomplete(std::list<std::string>::iterator from, std::list<std::string>::iterator to) final override
+	{
+		dryRun = true;
+		static_cast<Child*>(this)->run();
+		std::list<std::string> ret;
+		std::transform(options.begin(), options.end(), std::back_inserter(ret), [](const auto& p) {return p.first; });
+		return ret;
 	}
 
 public:
@@ -97,4 +147,4 @@ struct CliApp_##name: CliAppBase<CliApp_##name>  						\
 int CliApp_##name::run()
 
 
-#endif /* LIBUNO_TEST_CLIAPP_H_ */
+#endif /* CLI_BASE_CLIAPP_H_ */
