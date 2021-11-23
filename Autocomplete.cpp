@@ -46,7 +46,7 @@ struct Autocompleter: CliApp
 			if(nonOpt.size() >= 2)
 			{
 				auto it = nonOpt.begin();
-				const auto wordIdx = std::stoi(*it++);
+				const auto wordIdx = std::stoul(*it++);
 				const auto appName = *it++;
 
 				std::list<std::string> args;
