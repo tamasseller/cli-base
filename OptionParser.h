@@ -26,9 +26,11 @@
 #include <optional>
 #include <functional>
 #include <string>
-#include <stdexcept>
+#include <initializer_list>
 
 #include <cassert>
+
+#include "ArgumentReader.h"
 
 /**
  * Option parsing and usage information generator utility for CLI.
@@ -36,61 +38,6 @@
 struct OptionParser
 {
 	using cListIter = std::list<std::string>::const_iterator;
-
-	/// Argument value parser for option callbacks.
-	template<class T, class D = void> struct ArgumentParser;
-
-	template<class D> struct ArgumentParser<std::string, D>
-	{
-		static constexpr const auto typeName = "text";
-
-		static inline std::string parse(cListIter& it, cListIter end)
-		{
-			if(it == end)
-				throw std::runtime_error("missing string argument");
-
-			return *it++;
-		}
-	};
-
-	template<class D> struct ArgumentParser<int, D>
-	{
-		static constexpr const auto typeName = "int";
-
-		static inline int parse(cListIter& it, cListIter end)
-		{
-			if(it == end)
-				throw std::runtime_error("missing integer argument");
-
-			return std::stoi(*it++);
-		}
-	};
-
-	template<class D> struct ArgumentParser<unsigned int, D>
-	{
-		static constexpr const auto typeName = "uint";
-
-		static inline unsigned int parse(cListIter& it, cListIter end)
-		{
-			if(it == end)
-				throw std::runtime_error("missing integer argument");
-
-			return std::stoul(*it++);
-		}
-	};
-
-	template<class D> struct ArgumentParser<float, D>
-	{
-		static constexpr const auto typeName = "float";
-
-		static inline int parse(cListIter& it, cListIter end)
-		{
-			if(it == end)
-				throw std::runtime_error("missing integer argument");
-
-			return std::stof(*it++);
-		}
-	};
 
 	/**
 	 * A command line option.
@@ -108,14 +55,26 @@ struct OptionParser
 		 *
 		 * Reads arguments and calls registered user method, invoked when the option
 		 * key is matched. First argument is a reference to an iterator pointing to
-		 * the first argument, which needs to be incremented if used. The second one
-		 * is the end of the input sequence.
+		 * the first argument, which is incremented when a value is used. The second
+		 * one is the end of the input sequence.
 		 */
 		const std::function<void(cListIter&, cListIter)> parse;
 
+		/**
+		 * Argument suggestion callback.
+		 *
+		 * Tries to consume arguments, similarly to the parse method but if it runs
+		 * out of values calls the suggestion candidate generator for the type of the
+		 * missing argument and returns the suggested values as a list of strings.
+		 * If all arguments are present returns an empty list. The first argument is
+		 * a reference to an iterator pointing to the first argument, which is moved
+		 * forward as values are used up. The second one is the end of the input sequence.
+		 */
+		const std::function<std::optional<std::pair<int, std::list<std::string>>>(cListIter&, cListIter)> suggest;
+
 		/// Forwarding constructor
-		Option(const decltype(description) &description, decltype(optionTypes) &&optionTypes, decltype(parse) &&parse):
-			description(description), optionTypes(optionTypes), parse(parse) {}
+		Option(const decltype(description) &description, decltype(optionTypes) &&optionTypes, decltype(parse) &&parse, decltype(suggest) &&suggest):
+			description(description), optionTypes(optionTypes), parse(parse), suggest(suggest) {}
 	};
 
 	/**
@@ -142,7 +101,7 @@ struct OptionParser
 	};
 
 	/**
-	 * Helper used to invoke the correct
+	 * Helper used to invoke the correct argument readers.
 	 */
 	template<class Obj, class... Args>
 	static inline void parseOptions(void (Obj::* method)(Args...) const, const Obj& obj, cListIter& it, cListIter end)
@@ -151,6 +110,45 @@ struct OptionParser
 			[&obj, &method](auto&&... x){ (obj.*method)(std::forward<decltype(x)>(x)...); },
 			ArgumentParser<std::remove_const_t<std::remove_reference_t<Args>>>::parse(it, end)...
 		};
+	}
+
+	template<class T>
+	static inline std::optional<std::pair<int, std::list<std::string>>> suggestHelper(cListIter& it, cListIter end)
+	{
+		if(it == end)
+		{
+			return ArgumentParser<T>::suggest();
+		}
+
+		return std::nullopt;
+	}
+
+	/**
+	 * Helper used to invoke the correct argument value candidate generators.
+	 */
+	template<class Obj, class... Args>
+	static inline std::optional<std::pair<int, std::list<std::string>>> generateArgumentCandidates(void (Obj::* method)(Args...) const, cListIter& it, cListIter end)
+	{
+		std::optional<std::pair<int, std::list<std::string>>> ret;
+
+		CallArgumentEvaluationSequencingHelper{
+			[&ret](auto&&... x)
+			{
+				std::optional<std::pair<int, std::list<std::string>>> vs[] = {std::forward<decltype(x)>(x)...};
+
+				for(const auto v: vs)
+				{
+					if(v.has_value())
+					{
+						ret = v;
+						break;
+					}
+				}
+			},
+			suggestHelper<std::remove_const_t<std::remove_reference_t<Args>>>(it, end)...
+		};
+
+		return ret;
 	}
 
 	/**
@@ -192,10 +190,12 @@ public:
 	template<class C>
 	inline void addOptions(const std::list<std::string>& names, const std::string& description, C&& c)
 	{
-		auto opt = std::make_shared<Option>(description, optionTypes(&C::operator()), std::function([c{std::forward<C>(c)}](cListIter& it, cListIter end)
-		{
-			parseOptions(&C::operator(), c, it, end);
-		}));
+		auto opt = std::make_shared<Option>(
+				description,
+				optionTypes(&C::operator()),
+				std::function([c{std::forward<C>(c)}](cListIter& it, cListIter end) { parseOptions(&C::operator(), c, it, end); }),
+				std::function([](cListIter& it, cListIter end) { return generateArgumentCandidates(&C::operator(), it, end); })
+		);
 
 		for(auto n: names)
 		{

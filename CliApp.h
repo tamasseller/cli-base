@@ -23,6 +23,7 @@
 #include "OptionParser.h"
 
 #include <map>
+#include <set>
 #include <list>
 #include <string>
 
@@ -47,7 +48,7 @@ class CliApp
 	virtual bool visibleByDefault() const = 0;
 
 	/// Autocompletion entry point.
-	virtual std::list<std::string> autocomplete(std::list<std::string>::iterator from, std::list<std::string>::iterator to) = 0;
+	virtual std::pair<int, std::list<std::string>> autocomplete(std::list<std::string>::const_iterator from, std::list<std::string>::const_iterator to) = 0;
 
 protected:
 	/// Registers an applet in the global registry.
@@ -116,13 +117,41 @@ protected:
 	}
 
 	/// Autocompletion entry point.
-	inline virtual std::list<std::string> autocomplete(std::list<std::string>::iterator from, std::list<std::string>::iterator to) final override
+	inline virtual std::pair<int, std::list<std::string>> autocomplete(std::list<std::string>::const_iterator from, std::list<std::string>::const_iterator to) final override
 	{
 		dryRun = true;
 		static_cast<Child*>(this)->run();
+
+		std::set<std::shared_ptr<Option>> opts;
+		std::transform(options.begin(), options.end(), std::inserter(opts, opts.begin()), [](const auto& p) {return p.second; });
+
+		for(auto it = from; it != to; )
+		{
+			if(auto oit = options.find(*it++); oit != options.end())
+			{
+				if(auto ret = oit->second->suggest(it, to))
+				{
+					return *ret;
+				}
+
+				opts.erase(oit->second);
+			}
+		}
+
 		std::list<std::string> ret;
-		std::transform(options.begin(), options.end(), std::back_inserter(ret), [](const auto& p) {return p.first; });
-		return ret;
+
+		for(const auto &opt: opts)
+		{
+			for(const auto &o: options)
+			{
+				if(o.second == opt)
+				{
+					ret.push_back(o.first);
+				}
+			}
+		}
+
+		return {0, ret};
 	}
 
 public:

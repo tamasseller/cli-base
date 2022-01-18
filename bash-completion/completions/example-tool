@@ -6,18 +6,26 @@ alias _completion_funcname_=_${toolname}_completions
 
 _completion_funcname_()
 {
-	local cur prev words cword
+    local cur prev words cword
     _init_completion || return
-	
+    
     for i in ${!words[@]}; do
         words[i]="$(printf '%s' "${words[i]}" | xargs printf '%s\n' 2>/dev/null || true)"
     done
 
-	output="$(${COMP_WORDS[0]} _autocomplete $COMP_CWORD "${words[@]}")"
+    output="$(${COMP_WORDS[0]} _autocomplete $COMP_CWORD "${words[@]}")"
+    ret=$?
     local IFS=$'\n'
-    COMPREPLY=( $( compgen -W '$output' -- $cur ) )
+
+    case $ret in
+        0) COMPREPLY=( $( compgen -W '$output' -- $cur ) );;
+        1) COMPREPLY=( $( compgen -f -- $cur ) );;        
+        2) COMPREPLY=( $( compgen -d -- $cur ) );;
+    esac
+
+    return $ret;
 }
 
 shopt -q $expand_aliases_restore_flag expand_aliases
 
-complete -F "_${toolname}_completions" $toolname
+complete -o filenames -F "_${toolname}_completions" $toolname

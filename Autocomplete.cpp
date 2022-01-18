@@ -33,8 +33,8 @@ struct Autocompleter: CliApp
 
 	virtual bool visibleByDefault() const override { return false; }
 
-	virtual std::list<std::string> autocomplete(std::list<std::string>::iterator from, std::list<std::string>::iterator to) override {
-		return {"To understand recursion, you must first understand recursion"};
+	virtual std::pair<int, std::list<std::string>> autocomplete(std::list<std::string>::const_iterator from, std::list<std::string>::const_iterator to) override {
+		return {-1, {"To understand recursion, you must first understand recursion"}};
 	}
 
 	virtual int operator()(int argc, const char* argv[])
@@ -46,39 +46,50 @@ struct Autocompleter: CliApp
 			if(nonOpt.size() >= 2)
 			{
 				auto it = nonOpt.begin();
+
 				const auto wordIdx = std::stoul(*it++);
-				const auto appName = *it++;
+				assert(wordIdx > 0);
+
+				const auto binaryName = *it++;
 
 				std::list<std::string> args;
-				for(auto i = 0u; i < wordIdx; i++)
+				for(auto i = 1u; i < wordIdx; i++)
 				{
 					if(it == nonOpt.end())
 					{
-						throw std::runtime_error("Unexpected end of command line");
+						break;
 					}
 
 					args.push_back(std::move(*it++));
 				}
 
-				if(wordIdx)
+				if(args.empty())
 				{
-					auto argIt = args.begin();
+					for(const auto& a: ::CliApp::apps)
+					{
+						if(a.second->visibleByDefault())
+						{
+							std::cout << a.first << std::endl;
+						}
+					}
+				}
+				else
+				{
+					auto argIt = args.cbegin();
 					if(auto appIt = ::CliApp::apps.find(*argIt++); appIt != ::CliApp::apps.end())
 					{
-						for(const auto& a: appIt->second->autocomplete(argIt, args.end()))
+						auto ret = appIt->second->autocomplete(argIt, args.cend());
+
+						for(const auto& a: ret.second)
 						{
 							std::cout << a << std::endl;
 						}
+
+						return ret.first;
 					}
 					else
 					{
-						for(const auto& a: ::CliApp::apps)
-						{
-							if(a.second->visibleByDefault())
-							{
-								std::cout << a.first << std::endl;
-							}
-						}
+						return -1;
 					}
 				}
 

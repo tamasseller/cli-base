@@ -7,5 +7,6 @@ SOURCES := $(SOURCES) $(curdir)/Levenshtein.cpp
 SOURCES := $(SOURCES) $(curdir)/OptionParser.cpp
 SOURCES := $(SOURCES) $(curdir)/Autocomplete.cpp
 
+LIBS := $(LIBS) stdc++fs
 
 undefine curdir
